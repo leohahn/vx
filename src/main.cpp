@@ -9,7 +9,6 @@
 #include <GLFW/glfw3.h>
 
 #include "um.hpp"
-#include "um_math.hpp"
 #include "um_image.hpp"
 #include "vx_camera.hpp"
 #include "vx_memory.hpp"
@@ -19,13 +18,14 @@
 #include "vx_log_manager.hpp"
 #include "vx_chunk_manager.hpp"
 #include "vx_debug_counters.hpp"
-#include "vx_depth_buffer.hpp"
+#include "vx_depth_buffer_rasterizer.hpp"
 #include "vx.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mode);
 GLFWwindow* create_glfw_window_and_context(const char* title, u32 width, u32 height);
 void initialize_glew();
-void setup_projection_matrix(GLuint program, const Mat4x4f& projection);
+void setup_projection_matrix(GLuint program, const glm::mat4& projection);
 
 u64 g_debugCounters[DebugCycleCount_Count] = {0};
 
@@ -66,14 +66,14 @@ main(void)
     // -------------------------
     constexpr f32 SCREEN_RATIO = static_cast<f32>(SCREEN_WIDTH) / SCREEN_HEIGHT;
     f32 ZNEAR = 0.1f;
-    f32 ZFAR = 400.0f;
+    f32 ZFAR = 600.0f;
     f32 FOVY = 75.0f;
     f32 YAW = -90.0f;
     f32 PITCH = 0.0f;
-    Vec3f CAMERA_POSITION(0.0f, 0.0f, 10.0f);
-    Vec3f WORLD_UP(0.0f, 1.0f, 0.0f);
+    glm::vec3 CAMERA_POSITION(15.0f, 35.0f, 120.0f);
+    glm::vec3 WORLD_UP(0.0f, 1.0f, 0.0f);
     f32 CAMERA_MOVE_SPEED = 0.2f;
-    f32 CAMERA_TURN_SPEED = 1.5f;
+    f32 CAMERA_TURN_SPEED = 1.0f;
 
     vx::Camera camera(CAMERA_POSITION, FOVY, YAW, PITCH, WORLD_UP, SCREEN_RATIO,
                       ZNEAR, ZFAR, CAMERA_MOVE_SPEED, CAMERA_TURN_SPEED);
@@ -111,18 +111,15 @@ main(void)
     font_shader->load_uniform_location("model");
     font_shader->load_uniform_location("projection");
 
-    vx::Material material =
-    {
-        .ambientColor = Vec3f(0.5f, 0.4f, 0.3f),
-        .diffuseColor = Vec3f(0.5f, 0.4f, 0.3f),
-        .specularColor = Vec3f(0.0f, 0.0f, 0.0f),
-        .shininess = 62.0f,
-    };
+    vx::Material material;
+    material.ambientColor = glm::vec3(0.5f, 0.4f, 0.3f);
+    material.diffuseColor = glm::vec3(0.5f, 0.4f, 0.3f);
+    material.specularColor = glm::vec3(0.0f, 0.0f, 0.0f);
+    material.shininess = 62.0f;
     // -------------------------
     // User Interface (TODO: Improve this)
     // -------------------------
     auto* ui_manager = new vx::UIManager("Monoid", font_shader, &display);
-
     // -------------------------
     // Log
     // -------------------------
@@ -152,7 +149,8 @@ main(void)
     memory.ui_manager = ui_manager;
     memory.log_manager = log_manager;
     memory.chunk_manager = chunk_manager;
-    memory.depth_buf = new vx::DepthBuffer(display.width, display.height);
+    memory.depth_buf = new vx::DepthBufferRasterizer(display.width, display.height);
+    memory.depth_buf->set_projection_matrix(camera.frustum.projection);
 
     // Define variables to control time
     constexpr f64 DESIRED_FPS = 60.0;
@@ -201,9 +199,9 @@ main(void)
         // ===========================================================
         // Main render function is called here
         // ===========================================================
-        BEGIN_TIMED_BLOCK(DebugCycleCount_MainRender);
+        // BEGIN_TIMED_BLOCK(DebugCycleCount_MainRender);
         vx::main_render(memory, camera, keyboard);
-        END_TIMED_BLOCK(DebugCycleCount_MainRender);
+        // END_TIMED_BLOCK(DebugCycleCount_MainRender);
 
         glfwPollEvents();
         glfwSwapBuffers(display.window);
@@ -219,6 +217,8 @@ main(void)
 void
 key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mode)
 {
+    UNUSED(scancode);
+    UNUSED(mode);
     bool *keyboard = (bool*)glfwGetWindowUserPointer(window);
     keyboard[key] = action;
 }
@@ -256,9 +256,9 @@ initialize_glew()
 }
 
 void
-setup_projection_matrix(GLuint program, const Mat4x4f& projection)
+setup_projection_matrix(GLuint program, const glm::mat4& projection)
 {
     glUseProgram(program);
-    glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, &projection.m00);
+    glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUseProgram(0);
 }

@@ -217,7 +217,7 @@ vx::DepthBuffer::draw_to_file(const char* filepath)
 }
 
 void
-vx::DepthBuffer::draw_occluders(Quad3f* occluders, u16 numOccluders)
+vx::DepthBuffer::draw_occluders(Quad3* occluders, u16 numOccluders)
 {
     // NOTE(leo): Occluders are assumed to already be in normalized device coordinates.
     // I.e. multiply by the transform matrix before sending them here.
@@ -225,7 +225,7 @@ vx::DepthBuffer::draw_occluders(Quad3f* occluders, u16 numOccluders)
     for (i32 i = 0; i < numOccluders; i++)
     {
         // For each occluder we draw two triangles.
-        draw_triangle(occluders[i].p1, occluders[i].p2, occluders[i].p3);
-        draw_triangle(occluders[i].p3, occluders[i].p4, occluders[i].p1);
+        // draw_triangle(occluders[i].p1, occluders[i].p2, occluders[i].p3);
+        // draw_triangle(occluders[i].p3, occluders[i].p4, occluders[i].p1);
     }
 }

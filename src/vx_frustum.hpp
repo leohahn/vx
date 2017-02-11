@@ -3,7 +3,8 @@
 
 #include <stdbool.h>
 #include "um.hpp"
-#include "um_math.hpp"
+#include "glm/vec3.hpp"
+#include "glm/matrix.hpp"
 
 namespace vx
 {
@@ -12,27 +13,27 @@ struct Chunk;
 
 struct Frustum
 {
-    Vec3f   position;
-    f32     ratio;
-    f32     fovy;
+    glm::vec3 position;
+    f32       ratio;
+    f32       fovy;
 
-    f32     znear;
-    f32     znearWidth;
-    f32     znearHeight;
-    Vec3f   znearCenter;
+    f32       znear;
+    f32       znear_width;
+    f32       znear_height;
+    glm::vec3 znear_center;
 
-    f32     zfar;
-    f32     zfarWidth;
-    f32     zfarHeight;
-    Vec3f   zfarCenter;
+    f32       zfar;
+    f32       zfar_width;
+    f32       zfar_height;
+    glm::vec3 zfar_center;
 
+    // Calculated attributes
+    glm::vec3 front;
+    glm::vec3 right;
+    glm::vec3 up;
+    glm::vec3 normals[6];
 
-    Vec3f   front;
-    Vec3f   right;
-    Vec3f   up;
-    Vec3f   normals[6];
-
-    Mat4x4f projection;
+    glm::mat4 projection;
 
     bool chunk_inside(const Chunk& chunk) const;
 };

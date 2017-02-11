@@ -1,8 +1,8 @@
 -I/usr/include
 -I./include
 -I/usr/local/include
--I./dependencies
 -Wall
 -Wextra
 -std=c++14
 -I./src/dependencies
+-I./src/dependencies/glm

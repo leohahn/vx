@@ -2,9 +2,8 @@
 #define VX_UI_MANAGER_HPP
 
 #include <GL/glew.h>
+#include "glm/vec2.hpp"
 #include "vx_files.hpp"
-
-struct Vec2f;
 
 namespace vx
 {
@@ -23,7 +22,7 @@ struct UIManager
     UIManager(const char *fontname, Shader* shader, Display* display);
     ~UIManager();
 
-    void render_text(const char* str, Vec2f startPosition, f32 scale);
+    void render_text(const char* str, glm::vec2 startPosition, f32 scale);
 };
 
 }

@@ -36,7 +36,12 @@ typedef double      f64;
 #ifndef ASSERT
 # define Assert1(cond, file, line)                                  \
     if(!(cond)) {                                                   \
-        printf("\nAssert failed in %s (Line %d)\n", file, line);    \
+        printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");\
+        printf("\n");                                               \
+        printf("    Assert failed in %s (Line %d)\n", file, line);  \
+        printf("\n");                                               \
+        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n");\
+        fflush(stdout);                                             \
         abort();                                                    \
     }
 # define ASSERT(cond) Assert1(cond, __FILE__, __LINE__)
@@ -48,6 +53,10 @@ typedef double      f64;
 
 #ifndef SIGN
 #define SIGN(x) ((x) > 0) - ((x) < 0)
+#endif
+
+#ifndef UNUSED
+#define UNUSED(x) (void)(x)
 #endif
 
 namespace um

@@ -15,6 +15,7 @@
 #include "vx_memory.hpp"
 #include "vx_display.hpp"
 #include "um.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 void create_chunk_vertex_buffer(vx::Chunk& chunk);
 f64 get_noise(f64 x, f64 y, f64 z, f64 startFrequence, u32 octaveCount, f64 persistence, struct osn_context* ctx);
@@ -47,9 +48,10 @@ find_first_valid_position(um::Pairi& res, const SlidingBuffer& sbuf)
     return false;
 }
 
-Quad3f*
+Quad3*
 find_largest_quad(const SlidingBuffer& sbuf, vx::Chunk& chunk, vx::Face face)
 {
+    using vec3 = glm::vec3;
     //@Improvement, @Performance
     // NOTE(leo): This algorithm only tries to expand the first rectangle starting from 0, 0.
     // Consider the cases where the biggest rectangle does not start from this position.
@@ -148,7 +150,7 @@ Exit:;
         return nullptr;
 
     // Get world position of each of the indexes.
-    Vec3f p1Offset, p2Offset, p3Offset, p4Offset;
+    vec3 p1Offset, p2Offset, p3Offset, p4Offset;
     switch (face)
     {
     case vx::FACE_LEFT:
@@ -216,14 +218,14 @@ Exit:;
 
     // The origin of each block is always on the smaller coordinates. If we want to return a point
     // int the middle of the block, we have to sum the half size of the block to each of the points.
-    f32 halfBlock = (f32)vx::BLOCK_SIZE/2.0f;
-    Vec3f halfBlockVec = Vec3f(halfBlock, halfBlock, halfBlock);
+    f32 half_block = (f32)vx::BLOCK_SIZE/2.0f;
+    vec3 half_block_vec(half_block, half_block, half_block);
 
-    Quad3f* q = &chunk.occluders_data[face];
-    q->p1 = chunk.position + p1Offset + halfBlockVec;
-    q->p2 = chunk.position + p2Offset + halfBlockVec;
-    q->p3 = chunk.position + p3Offset + halfBlockVec;
-    q->p4 = chunk.position + p4Offset + halfBlockVec;
+    Quad3* q = &chunk.occluders_data[face];
+    q->p1 = chunk.position + p1Offset + half_block_vec;
+    q->p2 = chunk.position + p2Offset + half_block_vec;
+    q->p3 = chunk.position + p3Offset + half_block_vec;
+    q->p4 = chunk.position + p4Offset + half_block_vec;
 
     return q;
 }
@@ -341,12 +343,12 @@ create_chunk_occluders(vx::Chunk& chunk)
     // @SPEED(leo): It does not calculate the *biggest* occluder, so there are room for optimizations.
 
     // NOTE(leo): if no quad is found, NULL is returned
-    Quad3f* xposQuad = find_largest_quad(sbuf_xpos, chunk, vx::FACE_RIGHT);
-    Quad3f* xnegQuad = find_largest_quad(sbuf_xneg, chunk, vx::FACE_LEFT);
-    Quad3f* yposQuad = find_largest_quad(sbuf_ypos, chunk, vx::FACE_UP);
-    Quad3f* ynegQuad = find_largest_quad(sbuf_yneg, chunk, vx::FACE_DOWN);
-    Quad3f* zposQuad = find_largest_quad(sbuf_zpos, chunk, vx::FACE_FRONT);
-    Quad3f* znegQuad = find_largest_quad(sbuf_zneg, chunk, vx::FACE_BACK);
+    Quad3* xposQuad = find_largest_quad(sbuf_xpos, chunk, vx::FACE_RIGHT);
+    Quad3* xnegQuad = find_largest_quad(sbuf_xneg, chunk, vx::FACE_LEFT);
+    Quad3* yposQuad = find_largest_quad(sbuf_ypos, chunk, vx::FACE_UP);
+    Quad3* ynegQuad = find_largest_quad(sbuf_yneg, chunk, vx::FACE_DOWN);
+    Quad3* zposQuad = find_largest_quad(sbuf_zpos, chunk, vx::FACE_FRONT);
+    Quad3* znegQuad = find_largest_quad(sbuf_zneg, chunk, vx::FACE_BACK);
 
     chunk.occluders[vx::FACE_RIGHT] = xposQuad;
     chunk.occluders[vx::FACE_LEFT] = xnegQuad;
@@ -357,9 +359,8 @@ create_chunk_occluders(vx::Chunk& chunk)
 }
 
 vx::ChunkManager::ChunkManager()
+    : position(0.0f, 0.0f, 0.0f)
 {
-    this->position = Vec3f(0.0f, 0.0f, 0.0f);
-
     for (u32 i = 0; i < WORLD_SIZE; i++)
         for (u32 j = 0; j < WORLD_SIZE; j++)
             for (u32 k = 0; k < WORLD_SIZE; k++)
@@ -372,16 +373,17 @@ vx::ChunkManager::ChunkManager()
 void
 vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* shader, vx::Material material)
 {
+    using vec3 = glm::vec3;
     ASSERT(chunkX < WORLD_SIZE && chunkY < WORLD_SIZE && chunkZ < WORLD_SIZE);
 
     // Alias current chunk so it is easier to refer to it.
     vx::Chunk& chunk = this->chunks[chunkX][chunkY][chunkZ];
 
     // Set the world position of the chunks relative to the world position of the manager itself.
-    Vec3f position;
-    position.x = this->position.x + (chunkX * CHUNK_SIZE * BLOCK_SIZE);
-    position.y = this->position.y + (chunkY * CHUNK_SIZE * BLOCK_SIZE);
-    position.z = this->position.z + (chunkZ * CHUNK_SIZE * BLOCK_SIZE);
+    vec3 position;
+    position.x += chunkX * CHUNK_SIZE * BLOCK_SIZE;
+    position.y += chunkY * CHUNK_SIZE * BLOCK_SIZE;
+    position.z += chunkZ * CHUNK_SIZE * BLOCK_SIZE;
 
     chunk.material = material;
     chunk.shader = shader;
@@ -390,21 +392,21 @@ vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* s
     chunk.position.z = position.z;
     // Fill all the extreme vertices of the chunk.
     // The order of them does not matter, they are used for frustum culling.
-    f32 chunkOffset = BLOCK_SIZE * CHUNK_SIZE;
+    f32 chunk_offset = BLOCK_SIZE * CHUNK_SIZE;
     chunk.max_vertices[0] = position;
-    chunk.max_vertices[1] = position + Vec3f(0.0f, 0.0f, chunkOffset);
-    chunk.max_vertices[2] = position + Vec3f(0.0f, chunkOffset, 0.0f);
-    chunk.max_vertices[3] = position + Vec3f(chunkOffset, 0.0f, 0.0f);
-    chunk.max_vertices[4] = position + Vec3f(0.0f, chunkOffset, chunkOffset);
-    chunk.max_vertices[5] = position + Vec3f(chunkOffset, chunkOffset, 0.0f);
-    chunk.max_vertices[6] = position + Vec3f(chunkOffset, 0.0f, chunkOffset);
-    chunk.max_vertices[7] = position + Vec3f(chunkOffset, chunkOffset, chunkOffset);
+    chunk.max_vertices[1] = position + vec3(0.0f,         0.0f,         chunk_offset);
+    chunk.max_vertices[2] = position + vec3(0.0f,         chunk_offset, 0.0f);
+    chunk.max_vertices[3] = position + vec3(chunk_offset, 0.0f,         0.0f);
+    chunk.max_vertices[4] = position + vec3(0.0f,         chunk_offset, chunk_offset);
+    chunk.max_vertices[5] = position + vec3(chunk_offset, chunk_offset, 0.0f);
+    chunk.max_vertices[6] = position + vec3(chunk_offset, 0.0f,         chunk_offset);
+    chunk.max_vertices[7] = position + vec3(chunk_offset, chunk_offset, chunk_offset);
 
     // TODO:
     // This method of deciding which block is filled inside a chunk should eventually be refactored.
     //
     struct osn_context *ctx;
-    u32 numBlocks = 0;
+    u32 num_blocks = 0;
     ASSERT(open_simplex_noise(0, &ctx) == 0);
     srand(time(NULL)); // @Test
     for (int z = 0; z < CHUNK_SIZE; z++)
@@ -413,16 +415,17 @@ vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* s
         {
             for (int x = 0; x < CHUNK_SIZE; x++)
             {
-                Vec3f position = this->chunks[chunkX][chunkY][chunkZ].position;
-                Vec3f blockPosition;
+                vec3 position = this->chunks[chunkX][chunkY][chunkZ].position;
+                vec3 blockPosition;
                 blockPosition.x = position.x + (BLOCK_SIZE * x);
                 blockPosition.y = position.y + (BLOCK_SIZE * y);
                 blockPosition.z = position.z + (BLOCK_SIZE * z);
-                f64 noise = get_noise(
-                    blockPosition.x,
-                    blockPosition.y,
-                    blockPosition.z, 0.05, 2.0, 0.25, ctx);
-                bool exists = noise > 0.2 ? false : true;
+                // f64 noise = get_noise(
+                //     blockPosition.x,
+                //     blockPosition.y,
+                //     blockPosition.z, 0.05, 2.0, 0.25, ctx);
+                // bool exists = noise > 0.2 ? false : true;
+                bool exists = true;
 
                 /* bool exists = (rand() % 20) > 10 ? true : false; */
                 /* if (z == CHUNK_SIZE-1 && (x == 0 || x == 1 || x == 3 || x == 2)) */
@@ -433,12 +436,15 @@ vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* s
 
                 if (exists)
                 {
-                    numBlocks++;
+                    num_blocks++;
                 }
             }
         }
     }
-    this->chunks[chunkX][chunkY][chunkZ].num_blocks = numBlocks;
+    this->chunks[chunkX][chunkY][chunkZ].blocks[CHUNK_SIZE-1][CHUNK_SIZE-1][CHUNK_SIZE-1].exists = false;
+    num_blocks--;
+
+    this->chunks[chunkX][chunkY][chunkZ].num_blocks = num_blocks;
 
     open_simplex_noise_free(ctx);
 
@@ -450,14 +456,14 @@ vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* s
 }
 
 //@TEMP(leo): this function should be temporary.
-static Vec3f buf[vx::FACE_COUNT * 6]; // Each occluder has 6 vertices
+static glm::vec3 buf[vx::FACE_COUNT * 6]; // Each occluder has 6 vertices
 void
 render_chunk_occluders(const vx::Chunk& chunk)
 {
     memset(buf, 0, sizeof(buf));
     u32 v = 0;
     {
-        Quad3f* occ = chunk.occluders[vx::FACE_RIGHT];
+        Quad3* occ = chunk.occluders[vx::FACE_RIGHT];
         if (occ != NULL)
         {
             buf[v++] = occ->p1;
@@ -473,7 +479,7 @@ render_chunk_occluders(const vx::Chunk& chunk)
         }
     }
     {
-        Quad3f* occ = chunk.occluders[vx::FACE_LEFT];
+        Quad3* occ = chunk.occluders[vx::FACE_LEFT];
         if (occ != NULL)
         {
             buf[v++] = occ->p1;
@@ -489,7 +495,7 @@ render_chunk_occluders(const vx::Chunk& chunk)
         }
     }
     {
-        Quad3f* occ = chunk.occluders[vx::FACE_UP];
+        Quad3* occ = chunk.occluders[vx::FACE_UP];
         if (occ != NULL)
         {
             buf[v++] = occ->p1;
@@ -505,7 +511,7 @@ render_chunk_occluders(const vx::Chunk& chunk)
         }
     }
     {
-        Quad3f* occ = chunk.occluders[vx::FACE_DOWN];
+        Quad3* occ = chunk.occluders[vx::FACE_DOWN];
         if (occ != NULL)
         {
             buf[v++] = occ->p1;
@@ -521,7 +527,7 @@ render_chunk_occluders(const vx::Chunk& chunk)
         }
     }
     {
-        Quad3f* occ = chunk.occluders[vx::FACE_FRONT];
+        Quad3* occ = chunk.occluders[vx::FACE_FRONT];
         if (occ != NULL)
         {
             buf[v++] = occ->p1;
@@ -537,7 +543,7 @@ render_chunk_occluders(const vx::Chunk& chunk)
         }
     }
     {
-        Quad3f* occ = chunk.occluders[vx::FACE_BACK];
+        Quad3* occ = chunk.occluders[vx::FACE_BACK];
         if (occ != NULL)
         {
             buf[v++] = occ->p1;
@@ -575,7 +581,10 @@ render_chunk_occluders(const vx::Chunk& chunk)
 void
 vx::ChunkManager::render_occluders(const vx::Camera& camera, const vx::Memory& mem, const bool* keyboard) const
 {
-    Mat4x4f view = camera.view_matrix();
+    UNUSED(mem);
+    UNUSED(keyboard);
+
+    glm::mat4 view = camera.view_matrix();
     GLuint viewLoc;
     GLuint ambientColorLoc, diffuseColorLoc, specularColorLoc, shininessLoc;
     GLuint cameraPositionLoc, lightPositionLoc, lightColorLoc;
@@ -612,7 +621,7 @@ vx::ChunkManager::render_occluders(const vx::Camera& camera, const vx::Memory& m
                 lightColorLoc     = shader->uniform_location("light.color");
                 // Sets the corresponding uniforms.
                 // Transforms
-                glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view.m00);
+                glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
                 // Materials
                 material = this->chunks[i][j][k].material;
                 glUniform3f(ambientColorLoc, 1.0f, 0.0f, 0.0f);
@@ -643,22 +652,23 @@ vx::ChunkManager::render_occluders(const vx::Camera& camera, const vx::Memory& m
 }
 
 void
-vx::ChunkManager::render_chunks(const vx::Camera& camera, const vx::Memory& mem, const bool *keyboard) const
+vx::ChunkManager::render_chunks(const Frustum& frustum, const glm::mat4& view,
+                                const Memory& mem, const bool* keyboard) const
 {
+    UNUSED(mem);
+    UNUSED(keyboard);
     /* BEGIN_TIMED_BLOCK(DebugCycleCount_RenderChunks); */
 
-    Mat4x4f view = camera.view_matrix();
-    Mat4x4f transform = camera.frustum.projection * view;
-
-    GLuint viewLoc;
-    GLuint ambientColorLoc, diffuseColorLoc, specularColorLoc, shininessLoc;
-    GLuint cameraPositionLoc, lightPositionLoc, lightColorLoc;
+    GLuint view_loc;
+    GLuint ambient_color_loc, diffuse_color_loc, specular_color_loc, shininess_loc;
+    GLuint camera_position_loc, light_position_loc, light_color_loc;
     vx::Material material;
 
     for (u32 i = 0; i < WORLD_SIZE; i++)
         for (u32 j = 0; j < WORLD_SIZE; j++)
             for (u32 k = 0; k < WORLD_SIZE; k++)
             {
+
                 // =========================================================
                 // Verify if the chunk needs to be rendered or not.
                 // Steps:
@@ -671,7 +681,7 @@ vx::ChunkManager::render_chunks(const vx::Camera& camera, const vx::Memory& mem,
                 // -----------------
                 // Frustum Culling
                 // -----------------
-                bool chunkInsideFrustum = camera.frustum.chunk_inside(this->chunks[i][j][k]);
+                bool chunkInsideFrustum = frustum.chunk_inside(this->chunks[i][j][k]);
                 if (!chunkInsideFrustum) continue;
                 // -----------------
                 // Occlusion Culling
@@ -689,49 +699,46 @@ vx::ChunkManager::render_chunks(const vx::Camera& camera, const vx::Memory& mem,
 
                 glUseProgram(shader->program);
                 // Transform matrices locations
-                viewLoc           = shader->uniform_location("view");
+                view_loc            = shader->uniform_location("view");
                 // Material uniform locations
-                ambientColorLoc   = shader->uniform_location("material.ambientColor");
-                diffuseColorLoc   = shader->uniform_location("material.diffuseColor");
-                specularColorLoc  = shader->uniform_location("material.specularColor");
-                shininessLoc      = shader->uniform_location("material.shininess");
+                ambient_color_loc   = shader->uniform_location("material.ambientColor");
+                diffuse_color_loc   = shader->uniform_location("material.diffuseColor");
+                specular_color_loc  = shader->uniform_location("material.specularColor");
+                shininess_loc       = shader->uniform_location("material.shininess");
                 // Light position and color and camera position
-                cameraPositionLoc = shader->uniform_location("cameraPosition");
-                lightPositionLoc  = shader->uniform_location("light.position");
-                lightColorLoc     = shader->uniform_location("light.color");
+                camera_position_loc = shader->uniform_location("cameraPosition");
+                light_position_loc  = shader->uniform_location("light.position");
+                light_color_loc     = shader->uniform_location("light.color");
                 // Sets the corresponding uniforms.
                 // Transforms
-                glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view.m00);
+                glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
                 // Materials
                 material = this->chunks[i][j][k].material;
-                glUniform3f(ambientColorLoc,
+                glUniform3f(ambient_color_loc,
                             material.ambientColor.x,
                             material.ambientColor.y,
                             material.ambientColor.z);
-                glUniform3f(diffuseColorLoc,
+                glUniform3f(diffuse_color_loc,
                             material.diffuseColor.x,
                             material.diffuseColor.y,
                             material.diffuseColor.z);
-                glUniform3f(specularColorLoc,
+                glUniform3f(specular_color_loc,
                             material.specularColor.x,
                             material.specularColor.y,
                             material.specularColor.z);
-                glUniform1f(shininessLoc, material.shininess);
+                glUniform1f(shininess_loc, material.shininess);
                 // Light and Camera
-                glUniform3f(cameraPositionLoc,
-                            camera.frustum.position.x,
-                            camera.frustum.position.y,
-                            camera.frustum.position.z);
+                glUniform3f(camera_position_loc, frustum.position.x, frustum.position.y, frustum.position.z);
 
                 f64 time = glfwGetTime();
-                Vec3f lightPosition;
+                glm::vec3 lightPosition;
                 lightPosition.x = sinf(time) * 50.0f;
                 lightPosition.y = 300.0f;
                 lightPosition.z = cosf(time) * 50.0f;
                 /* vec3_Print(lightPosition); */
                 /* glUniform3f(lightPositionLoc, lightPosition.x, lightPosition.y, lightPosition.z); */
-                glUniform3f(lightPositionLoc, 50.0f, 100.0f, 50.0f);
-                glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f); // white color
+                glUniform3f(light_position_loc, 50.0f, 100.0f, 50.0f);
+                glUniform3f(light_color_loc, 1.0f, 1.0f, 1.0f); // white color
                 // ===========================
                 //          Render
                 // ===========================
@@ -746,19 +753,17 @@ vx::ChunkManager::render_chunks(const vx::Camera& camera, const vx::Memory& mem,
 }
 
 void
-vx::ChunkManager::render_chunks_wireframe(const vx::Camera& camera, const vx::Shader* shader) const
+vx::ChunkManager::render_chunks_wireframe(const glm::mat4& view, const Shader* shader) const
 {
-    Mat4x4f view = camera.view_matrix();
-    GLuint viewLoc;
+    GLuint view_loc = shader->uniform_location("view");
+    glUseProgram(shader->program);
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+
     for (u32 i = 0; i < WORLD_SIZE; i++)
         for (u32 j = 0; j < WORLD_SIZE; j++)
             for (u32 k = 0; k < WORLD_SIZE; k++)
             {
-                glUseProgram(shader->program);
-                viewLoc = shader->uniform_location("view");
-                glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view.m00);
-                // ===========================
-                //          Render
+                // Render
                 // ===========================
                 glBindVertexArray(this->chunks[i][j][k].vao);
                 glDrawArrays(GL_TRIANGLES, 0, this->chunks[i][j][k].num_vertices);
@@ -769,14 +774,15 @@ vx::ChunkManager::render_chunks_wireframe(const vx::Camera& camera, const vx::Sh
 void
 create_chunk_vertex_buffer(vx::Chunk& chunk)
 {
+    using vec3 = glm::vec3;
     /*
       TODO: @Cleanup
 
       This code can be heavily decreased in line size, since there is a lot of
       code repetition.
     */
-    static const u64 SIZE = ((sizeof(Vec3f) * 2 * 8) * vx::CHUNK_SIZE * vx::CHUNK_SIZE * vx::CHUNK_SIZE);
-    static Vec3f vertices[SIZE];
+    static const u64 SIZE = ((sizeof(vec3) * 2 * 8) * vx::CHUNK_SIZE * vx::CHUNK_SIZE * vx::CHUNK_SIZE);
+    static vec3 vertices[SIZE];
     static bool face[vx::CHUNK_SIZE][vx::CHUNK_SIZE];
 
     /* ===============================================================
@@ -841,35 +847,35 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
 
                 // TODO: Add this to the vertices list to be added to VBO
                 // quadBeginX, quadEndX, quadBeginY, quadEndY
-                Vec3f leftBottom;
+                vec3 leftBottom;
                 leftBottom.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 leftBottom.z = chunk.position.z + (z * vx::BLOCK_SIZE);
-                Vec3f leftTop;
+                vec3 leftTop;
                 leftTop.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 leftTop.z = chunk.position.z + (z * vx::BLOCK_SIZE);
-                Vec3f rightBottom;
+                vec3 rightBottom;
                 rightBottom.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 rightBottom.z = chunk.position.z + (z * vx::BLOCK_SIZE);
-                Vec3f rightTop;
+                vec3 rightTop;
                 rightTop.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 rightTop.z = chunk.position.z + (z * vx::BLOCK_SIZE);
 
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(0.0f, 0.0f, -1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, -1.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(0.0f, 0.0f, -1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, -1.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(0.0f, 0.0f, -1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, -1.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(0.0f, 0.0f, -1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, -1.0f);
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(0.0f, 0.0f, -1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, -1.0f);
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(0.0f, 0.0f, -1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, -1.0f);
             }
         }
     }
@@ -932,35 +938,35 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
                     for (i32 qx = quadBeginX; qx <= quadEndX; qx++)
                         face[qx][qy] = true;
 
-                Vec3f leftBottom;
+                vec3 leftBottom;
                 leftBottom.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 leftBottom.z = (chunk.position.z + vx::BLOCK_SIZE) + (z * vx::BLOCK_SIZE);
-                Vec3f leftTop;
+                vec3 leftTop;
                 leftTop.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 leftTop.z = (chunk.position.z + vx::BLOCK_SIZE) + (z * vx::BLOCK_SIZE);
-                Vec3f rightBottom;
+                vec3 rightBottom;
                 rightBottom.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 rightBottom.z = (chunk.position.z + vx::BLOCK_SIZE) + (z * vx::BLOCK_SIZE);
-                Vec3f rightTop;
+                vec3 rightTop;
                 rightTop.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 rightTop.z = (chunk.position.z + vx::BLOCK_SIZE) + (z * vx::BLOCK_SIZE);
 
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(0.0f, 0.0f, 1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, 1.0f);
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(0.0f, 0.0f, 1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, 1.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(0.0f, 0.0f, 1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, 1.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(0.0f, 0.0f, 1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, 1.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(0.0f, 0.0f, 1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, 1.0f);
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(0.0f, 0.0f, 1.0f);
+                vertices[v++] = vec3(0.0f, 0.0f, 1.0f);
             }
         }
     }
@@ -1023,35 +1029,35 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
                     for (i32 qz = quadBeginZ; qz <= quadEndZ; qz++)
                         face[qz][qy] = true;
 
-                Vec3f leftBottom;
+                vec3 leftBottom;
                 leftBottom.x = chunk.position.x + (x * vx::BLOCK_SIZE);
                 leftBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 leftBottom.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f leftTop;
+                vec3 leftTop;
                 leftTop.x = chunk.position.x + (x * vx::BLOCK_SIZE);
                 leftTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 leftTop.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f rightBottom;
+                vec3 rightBottom;
                 rightBottom.x = chunk.position.x + (x * vx::BLOCK_SIZE);
                 rightBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 rightBottom.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
-                Vec3f rightTop;
+                vec3 rightTop;
                 rightTop.x = chunk.position.x + (x * vx::BLOCK_SIZE);
                 rightTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 rightTop.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
 
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(-1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(-1.0f, 0.0f, 0.0f);
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(-1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(-1.0f, 0.0f, 0.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(-1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(-1.0f, 0.0f, 0.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(-1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(-1.0f, 0.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(-1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(-1.0f, 0.0f, 0.0f);
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(-1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(-1.0f, 0.0f, 0.0f);
             }
         }
     }
@@ -1115,35 +1121,35 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
                     for (i32 qz = quadBeginZ; qz <= quadEndZ; qz++)
                         face[qz][qy] = true;
 
-                Vec3f rightBottom;
+                vec3 rightBottom;
                 rightBottom.x = (chunk.position.x + vx::BLOCK_SIZE) + (x * vx::BLOCK_SIZE);
                 rightBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 rightBottom.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f rightTop;
+                vec3 rightTop;
                 rightTop.x = (chunk.position.x + vx::BLOCK_SIZE) + (x * vx::BLOCK_SIZE);
                 rightTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 rightTop.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f leftBottom;
+                vec3 leftBottom;
                 leftBottom.x = (chunk.position.x + vx::BLOCK_SIZE) + (x * vx::BLOCK_SIZE);
                 leftBottom.y = chunk.position.y + (quadBeginY * vx::BLOCK_SIZE);
                 leftBottom.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
-                Vec3f leftTop;
+                vec3 leftTop;
                 leftTop.x = (chunk.position.x + vx::BLOCK_SIZE) + (x * vx::BLOCK_SIZE);
                 leftTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (quadEndY * vx::BLOCK_SIZE);
                 leftTop.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
 
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(1.0f, 0.0f, 0.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(1.0f, 0.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(1.0f, 0.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(1.0f, 0.0f, 0.0f);
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(1.0f, 0.0f, 0.0f);
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(1.0f, 0.0f, 0.0f);
+                vertices[v++] = vec3(1.0f, 0.0f, 0.0f);
             }
         }
     }
@@ -1206,35 +1212,35 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
                     for (i32 qx = quadBeginX; qx <= quadEndX; qx++)
                         face[qx][qz] = true;
 
-                Vec3f rightBottom;
+                vec3 rightBottom;
                 rightBottom.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightBottom.y = chunk.position.y + (y * vx::BLOCK_SIZE);
                 rightBottom.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f rightTop;
+                vec3 rightTop;
                 rightTop.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightTop.y = chunk.position.y + (y * vx::BLOCK_SIZE);
                 rightTop.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
-                Vec3f leftBottom;
+                vec3 leftBottom;
                 leftBottom.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftBottom.y = chunk.position.y + (y * vx::BLOCK_SIZE);
                 leftBottom.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f leftTop;
+                vec3 leftTop;
                 leftTop.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftTop.y = chunk.position.y + (y * vx::BLOCK_SIZE);
                 leftTop.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
 
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(0.0f, -1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, -1.0f, 0.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(0.0f, -1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, -1.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(0.0f, -1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, -1.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(0.0f, -1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, -1.0f, 0.0f);
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(0.0f, -1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, -1.0f, 0.0f);
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(0.0f, -1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, -1.0f, 0.0f);
             }
         }
     }
@@ -1296,35 +1302,35 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
                     for (i32 qx = quadBeginX; qx <= quadEndX; qx++)
                         face[qx][qz] = true;
 
-                Vec3f rightBottom;
+                vec3 rightBottom;
                 rightBottom.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightBottom.y = (chunk.position.y + vx::BLOCK_SIZE) + (y * vx::BLOCK_SIZE);
                 rightBottom.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
-                Vec3f rightTop;
+                vec3 rightTop;
                 rightTop.x = (chunk.position.x + vx::BLOCK_SIZE) + (quadEndX * vx::BLOCK_SIZE);
                 rightTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (y * vx::BLOCK_SIZE);
                 rightTop.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
-                Vec3f leftBottom;
+                vec3 leftBottom;
                 leftBottom.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftBottom.y = (chunk.position.y + vx::BLOCK_SIZE) + (y * vx::BLOCK_SIZE);
                 leftBottom.z = (chunk.position.z + vx::BLOCK_SIZE) + (quadEndZ * vx::BLOCK_SIZE);
-                Vec3f leftTop;
+                vec3 leftTop;
                 leftTop.x = chunk.position.x + (quadBeginX * vx::BLOCK_SIZE);
                 leftTop.y = (chunk.position.y + vx::BLOCK_SIZE) + (y * vx::BLOCK_SIZE);
                 leftTop.z = chunk.position.z + (quadBeginZ * vx::BLOCK_SIZE);
 
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(0.0f, 1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, 1.0f, 0.0f);
                 vertices[v++] = rightTop;
-                vertices[v++] = Vec3f(0.0f, 1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, 1.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(0.0f, 1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, 1.0f, 0.0f);
                 vertices[v++] = leftTop;
-                vertices[v++] = Vec3f(0.0f, 1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, 1.0f, 0.0f);
                 vertices[v++] = leftBottom;
-                vertices[v++] = Vec3f(0.0f, 1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, 1.0f, 0.0f);
                 vertices[v++] = rightBottom;
-                vertices[v++] = Vec3f(0.0f, 1.0f, 0.0f);
+                vertices[v++] = vec3(0.0f, 1.0f, 0.0f);
             }
         }
     }
@@ -1349,7 +1355,7 @@ create_chunk_vertex_buffer(vx::Chunk& chunk)
 
 f64
 get_noise_2D(f64 x, f64 y, f64 startFrequence, u32 octaveCount,
-           f64 persistence, struct osn_context *ctx)
+             f64 persistence, struct osn_context *ctx)
 {
     f64 noise = 0;
     f64 normalizeFactor = 0;
@@ -1372,7 +1378,7 @@ get_noise_2D(f64 x, f64 y, f64 startFrequence, u32 octaveCount,
 
 f64
 get_noise(f64 x, f64 y, f64 z, f64 startFrequence, u32 octaveCount,
-         f64 persistence, struct osn_context *ctx)
+          f64 persistence, struct osn_context *ctx)
 {
     f64 noise = 0;
     f64 normalizeFactor = 0;

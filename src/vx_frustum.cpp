@@ -1,52 +1,53 @@
 #include "vx_frustum.hpp"
 #include <stdlib.h>
 #include <stdbool.h>
-#include "um_math.hpp"
 #include "vx_chunk_manager.hpp"
 
 bool
 vx::Frustum::chunk_inside(const vx::Chunk& chunk) const
 {
-    Vec3f offsetFarRight = this->right * (0.5 * this->zfarWidth);
+    using vec3 = glm::vec3;
 
-    Vec3f farTopLeft = this->zfarCenter + this->up * (this->zfarHeight * 0.5) - offsetFarRight;
-    Vec3f farTopRight = this->zfarCenter + this->up * (this->zfarHeight * 0.5) + offsetFarRight;
-    Vec3f farBottomLeft = this->zfarCenter - this->up * (this->zfarHeight * 0.5) - offsetFarRight;
-    Vec3f farBottomRight = this->zfarCenter - this->up * (this->zfarHeight * 0.5) + offsetFarRight;
+    vec3 offsetFarRight = this->right * (0.5f * this->zfar_width);
 
-    Vec3f offset_near_right = this->right * (this->znearWidth * 0.5);
-    Vec3f nearTopLeft =
-        (this->znearCenter + this->up * (this->znearHeight * 0.5)) - this->right * (this->znearWidth * 0.5);
-    Vec3f nearTopRight =
-        (this->znearCenter + this->up * (this->znearHeight * 0.5)) + this->right * (this->znearWidth * 0.5);
-    Vec3f nearBottomLeft =
-        (this->znearCenter - this->up * (this->znearHeight * 0.5)) - this->right * (this->znearWidth * 0.5);
-    Vec3f nearBottomRight =
-        (this->znearCenter - this->up * (this->znearHeight * 0.5)) + this->right * (this->znearWidth * 0.5);
+    vec3 farTopLeft = this->zfar_center + this->up * (this->zfar_height * 0.5f) - offsetFarRight;
+    vec3 farTopRight = this->zfar_center + this->up * (this->zfar_height * 0.5f) + offsetFarRight;
+    vec3 farBottomLeft = this->zfar_center - this->up * (this->zfar_height * 0.5f) - offsetFarRight;
+    vec3 farBottomRight = this->zfar_center - this->up * (this->zfar_height * 0.5f) + offsetFarRight;
 
-    Vec3f topLeftVec = farTopLeft - nearTopLeft;
-    Vec3f bottomLeftVec = farBottomLeft - nearBottomLeft;
-    Vec3f topRightVec = farTopRight - nearTopRight;
-    Vec3f bottomRightVec = farBottomRight - nearBottomRight;
-    Vec3f farH = farTopLeft - farTopRight;
-    Vec3f farV = farBottomLeft - farTopLeft;
-    Vec3f frustumNormals[6] =
+    vec3 offset_near_right = this->right * (this->znear_width * 0.5f);
+    vec3 nearTopLeft =
+        (this->znear_center + this->up * (this->znear_height * 0.5f)) - this->right * (this->znear_width * 0.5f);
+    vec3 nearTopRight =
+        (this->znear_center + this->up * (this->znear_height * 0.5f)) + this->right * (this->znear_width * 0.5f);
+    vec3 nearBottomLeft =
+        (this->znear_center - this->up * (this->znear_height * 0.5f)) - this->right * (this->znear_width * 0.5f);
+    vec3 nearBottomRight =
+        (this->znear_center - this->up * (this->znear_height * 0.5f)) + this->right * (this->znear_width * 0.5f);
+
+    vec3 topLeftVec = farTopLeft - nearTopLeft;
+    vec3 bottomLeftVec = farBottomLeft - nearBottomLeft;
+    vec3 topRightVec = farTopRight - nearTopRight;
+    vec3 bottomRightVec = farBottomRight - nearBottomRight;
+    vec3 farH = farTopLeft - farTopRight;
+    vec3 farV = farBottomLeft - farTopLeft;
+    vec3 frustumNormals[6] =
     {
         // Right normal
-        um::normalize(um::cross(bottomRightVec, topRightVec)),
+        glm::normalize(glm::cross(bottomRightVec, topRightVec)),
         /* UM::Normalize(Vec3f_Cross(farV, topRightVec)), */
         // LEft normal
-        um::normalize(um::cross(topLeftVec, bottomLeftVec)),
+        glm::normalize(glm::cross(topLeftVec, bottomLeftVec)),
         // TOp normal
-        um::normalize(um::cross(topRightVec, topLeftVec)),
+        glm::normalize(glm::cross(topRightVec, topLeftVec)),
         // BOttom normal
-        um::normalize(um::cross(bottomLeftVec, bottomRightVec)),
+        glm::normalize(glm::cross(bottomLeftVec, bottomRightVec)),
         // FAr normal
-        um::normalize(um::cross(farV, farH)),
+        glm::normalize(glm::cross(farV, farH)),
         // NEar normal
-        um::normalize(um::cross(farH, farV))
+        glm::normalize(glm::cross(farH, farV))
     };
-    Vec3f frustumPoints[6] =
+    vec3 frustumPoints[6] =
     {
         farTopRight,
         farTopLeft,
@@ -57,14 +58,14 @@ vx::Frustum::chunk_inside(const vx::Chunk& chunk) const
     };
 
     bool insideFrustum = true;
-    Vec3f pointVec;
+    vec3 pointVec;
     for (i32 p = 0; p < 6; p++)
     {
         bool insidePlane = false;
         for (i32 v = 0; v < 8; v++)
         {
             pointVec = frustumPoints[p] - chunk.max_vertices[v];
-            if (um::dot(pointVec, frustumNormals[p]) >= 0.0f)
+            if (glm::dot(pointVec, frustumNormals[p]) >= 0.0f)
             {
                 insidePlane = true;
             }

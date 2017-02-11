@@ -1,108 +1,107 @@
 #include "vx_camera.hpp"
 #include "vx_frustum.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 void
-update_frustum_orientation(vx::Frustum& frustum, f32 yaw, f32 pitch, Vec3f upWorld)
+update_frustum_orientation(vx::Frustum& frustum, f32 yaw, f32 pitch, glm::vec3 up_world)
 {
-    f32 pitchInRads = um::radians(pitch);
-    f32 yawInRads = um::radians(yaw);
+    f32 pitch_rads = glm::radians(pitch);
+    f32 yaw_rads = glm::radians(yaw);
 
-    Vec3f front;
-    front.x = cosf(pitchInRads) * cosf(yawInRads);
-    front.y = sinf(pitchInRads);
-    front.z = cosf(pitchInRads) * sinf(yawInRads);
-    frustum.front = um::normalize(front);
-    frustum.right = um::normalize(um::cross(frustum.front, upWorld));
-    frustum.up = um::normalize(um::cross(frustum.right, frustum.front));
+    glm::vec3 front;
+    front.x = cosf(pitch_rads) * cosf(yaw_rads);
+    front.y = sinf(pitch_rads);
+    front.z = cosf(pitch_rads) * sinf(yaw_rads);
+
+    frustum.front = glm::normalize(front);
+    frustum.right = glm::normalize(glm::cross(frustum.front, up_world));
+    frustum.up = glm::normalize(glm::cross(frustum.right, frustum.front));
 }
 
 void
 update_frustum_points(vx::Frustum& frustum)
 {
-    f32 fovy_rads = um::radians(frustum.fovy);
-    frustum.znearCenter = frustum.position + frustum.front * frustum.znear;
-    frustum.zfarCenter = frustum.position + frustum.front * frustum.zfar;
-    frustum.zfarHeight = fabs(2 * tanf(fovy_rads / 2) * frustum.zfar);
-    frustum.zfarWidth = frustum.zfarHeight * frustum.ratio;
-    frustum.znearHeight = fabs(2 * tanf(fovy_rads / 2) * frustum.znear);
-    frustum.znearWidth = frustum.znearHeight * frustum.ratio;
+    f32 fovy_rads = glm::radians(frustum.fovy);
+    frustum.znear_center = frustum.position + frustum.front * frustum.znear;
+    frustum.zfar_center  = frustum.position + frustum.front * frustum.zfar;
+    frustum.zfar_height  = fabs(2 * tanf(fovy_rads / 2) * frustum.zfar);
+    frustum.zfar_width   = frustum.zfar_height * frustum.ratio;
+    frustum.znear_height = fabs(2 * tanf(fovy_rads / 2) * frustum.znear);
+    frustum.znear_width  = frustum.znear_height * frustum.ratio;
 }
 
-vx::Camera::Camera(Vec3f position, f32 fovy, f32 yaw, f32 pitch, Vec3f upWorld, f32 ratio,
-                   f32 znear, f32 zfar, f32 moveSpeed, f32 turnSpeed)
+vx::Camera::Camera(glm::vec3 position, f32 fovy, f32 yaw, f32 pitch, glm::vec3 up_world, f32 ratio,
+                   f32 znear, f32 zfar, f32 move_speed, f32 turn_speed)
+    : yaw(yaw)
+    , pitch(pitch)
+    , up_world(up_world)
+    , move_speed(move_speed)
+    , turn_speed(turn_speed)
 {
-    this->yaw = yaw;
-    this->pitch = pitch;
-    this->upWorld = upWorld;
-    this->moveSpeed = moveSpeed;
-    this->turnSpeed = turnSpeed;
-
-    vx::Frustum frustum;
     frustum.position = position;
     frustum.ratio = ratio;
     frustum.fovy = fovy;
     frustum.znear = znear;
     frustum.zfar = zfar;
-    frustum.projection = um::perspective(fovy, ratio, znear, zfar);
+    frustum.projection = glm::perspective(glm::radians(fovy), ratio, znear, zfar);
 
-    update_frustum_orientation(frustum, yaw, pitch, upWorld);
+    update_frustum_orientation(frustum, yaw, pitch, up_world);
     update_frustum_points(frustum);
-
-    this->frustum = frustum;
 }
 
 void
-vx::Camera::rotate_yaw(f32 yawDegrees)
+vx::Camera::rotate_yaw(f32 yaw_degrees)
 {
-    this->yaw += yawDegrees;
-    update_frustum_orientation(this->frustum, this->yaw, this->pitch, this->upWorld);
+    this->yaw += yaw_degrees;
+    update_frustum_orientation(this->frustum, this->yaw, this->pitch, this->up_world);
     update_frustum_points(this->frustum);
 }
 
 void
-vx::Camera::rotate_pitch(f32 pitchDegrees)
+vx::Camera::rotate_pitch(f32 pitch_degrees)
 {
-    f32 newPitch = pitchDegrees + this->pitch;
+    f32 new_pitch = pitch_degrees + this->pitch;
 
-    if ((i32)newPitch > 89 || (i32)newPitch < -89)
+    if ((i32)new_pitch > 89 || (i32)new_pitch < -89)
         return;
 
-    this->pitch = newPitch;
+    this->pitch = new_pitch;
 
-    update_frustum_orientation(this->frustum, this->yaw, this->pitch, this->upWorld);
+    update_frustum_orientation(this->frustum, this->yaw, this->pitch, this->up_world);
     update_frustum_points(this->frustum);
 }
 
-Mat4x4f
+glm::mat4
 vx::Camera::view_matrix() const
 {
-    return um::look_at(this->frustum.position, this->frustum.position + this->frustum.front, this->upWorld);
+    return glm::lookAt(frustum.position, frustum.position + frustum.front, frustum.up);
 }
 
 void
 vx::Camera::move(vx::Camera::Direction dir, f64 delta)
 {
+    f32 offset = move_speed * delta;
     switch (dir)
     {
     case vx::Camera::FORWARDS:
-        this->frustum.position = this->frustum.position + this->frustum.front * (this->moveSpeed * delta);
+        frustum.position += frustum.front * offset;
         break;
 
     case vx::Camera::BACKWARDS:
-        this->frustum.position = this->frustum.position + (-this->frustum.front * (this->moveSpeed * delta));
+        frustum.position -= frustum.front * offset;
         break;
 
     case vx::Camera::LEFT:
-        this->frustum.position = this->frustum.position + (-this->frustum.right * (this->moveSpeed * delta));
+        frustum.position -= frustum.right * offset;
         break;
 
     case vx::Camera::RIGHT:
-        this->frustum.position = this->frustum.position + this->frustum.right * (this->moveSpeed * delta);
+        frustum.position += frustum.right * offset;
         break;
 
     default:
         ASSERT(false);
     }
 
-    update_frustum_points(this->frustum);
+    update_frustum_points(frustum);
 }

@@ -9,17 +9,17 @@ struct UIManager;
 struct LogManager;
 struct ChunkManager;
 struct Display;
-struct DepthBuffer;
+struct DepthBufferRasterizer;
 
 
 struct Memory
 {
-    ShaderManager*     shader_manager;
-    UIManager*         ui_manager;
-    LogManager*        log_manager;
-    ChunkManager*      chunk_manager;
-    Display*           display;
-    DepthBuffer*       depth_buf;
+    ShaderManager*          shader_manager;
+    UIManager*              ui_manager;
+    LogManager*             log_manager;
+    ChunkManager*           chunk_manager;
+    Display*                display;
+    DepthBufferRasterizer*  depth_buf;
 };
 
 }

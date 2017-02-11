@@ -3,8 +3,7 @@
 
 #include <stdlib.h>
 #include "um.hpp"
-
-struct Vec3f;
+#include "glm/glm.hpp"
 
 namespace vx
 {
@@ -25,7 +24,7 @@ struct LogManager
     ~LogManager();
 
     void log_fps(f32 fps);
-    void log_camera(Vec3f position, Vec3f front);
+    void log_camera(glm::vec3 position, glm::vec3 front);
 };
 
 }

@@ -1,7 +1,6 @@
 #include "vx_log_manager.hpp"
 #include <stdio.h>
 #include <string.h>
-#include "um_math.hpp"
 
 #define FPS_BUFFER_SIZE 20
 #define CAMERA_BUFFER_SIZE 200
@@ -26,7 +25,7 @@ vx::LogManager::log_fps(f32 fps)
 }
 
 void
-vx::LogManager::log_camera(Vec3f position, Vec3f front)
+vx::LogManager::log_camera(glm::vec3 position, glm::vec3 front)
 {
     memset(this->camera, 0, sizeof(char) * CAMERA_BUFFER_SIZE);
     /* snprintf(manager->camera, CAMERA_BUFFER_SIZE, */

@@ -2,16 +2,17 @@
 #define VX_MATERIAL_HPP
 
 #include "um.hpp"
-#include "um_math.hpp"
+#include "vx_math.hpp"
+#include "glm/vec3.hpp"
 
 namespace vx
 {
 
 struct Material
 {
-    Vec3f ambientColor;
-    Vec3f diffuseColor;
-    Vec3f specularColor;
+    glm::vec3 ambientColor;
+    glm::vec3 diffuseColor;
+    glm::vec3 specularColor;
     f32   shininess;
 };
 

@@ -2,14 +2,16 @@
 #include <string.h>
 #include "vx_files.hpp"
 #include "um.hpp"
-#include "um_math.hpp"
+#include "glm/glm.hpp"
+#include "glm/gtx/transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "vx_display.hpp"
 #include "vx_shader_manager.hpp"
 
 #define MAX_LETTERS   50
 #define VERTICES_LEN (MAX_LETTERS * 6)
 
-static Vec4f vertices[VERTICES_LEN];
+static glm::vec4 vertices[VERTICES_LEN];
 
 vx::UIManager::UIManager(const char* fontname, vx::Shader* shader, vx::Display* display)
     : shader(shader)
@@ -26,9 +28,10 @@ vx::UIManager::UIManager(const char* fontname, vx::Shader* shader, vx::Display* 
     glBindVertexArray(0);
 
     // Setup projection matrix on the shader
-    Mat4x4f projection = um::orthographic(0.0f, (f32)display->width, 0.0f, (f32)display->height, -1.0f, 1.0f);
+    glm::mat4 projection = glm::ortho(0.0f, (f32)display->width, 0.0f, (f32)display->height, -1.0f, 1.0f);
     glUseProgram(shader->program);
-    glUniformMatrix4fv(glGetUniformLocation(shader->program, "projection"), 1, GL_FALSE, &projection.m00);
+    glUniformMatrix4fv(glGetUniformLocation(shader->program, "projection"),
+                       1, GL_FALSE, glm::value_ptr(projection));
     glUseProgram(0);
 }
 
@@ -40,11 +43,11 @@ vx::UIManager::~UIManager()
 }
 
 void
-vx::UIManager::render_text(const char* str, Vec2f start, f32 scale)
+vx::UIManager::render_text(const char* str, glm::vec2 start, f32 scale)
 {
     const u64 img_width = this->fntfile->image_width;
     const u64 img_height = this->fntfile->image_height;
-    Vec2f cursor = start;
+    glm::vec2 cursor = start;
     u32 v = 0;
     u32 textLen = 0;
     vx::FntChar* chr;
@@ -62,22 +65,22 @@ vx::UIManager::render_text(const char* str, Vec2f start, f32 scale)
         textLen++;
         chr = &this->fntfile->characters[(i32)str[i]];
 
-        Vec4f tleft;
+        glm::vec4 tleft;
         tleft.x = cursor.x + chr->xoffset;
         tleft.y = line_top_y - chr->yoffset;
         tleft.z = (f32)chr->x / img_width;
         tleft.w = (f32)(img_height - chr->y) / img_height;
-        Vec4f bleft;
+        glm::vec4 bleft;
         bleft.x = tleft.x;
         bleft.y = tleft.y - chr->height;
         bleft.z = (f32)chr->x / img_width;
         bleft.w = (f32)(img_height - (chr->y + chr->height)) / img_height;
-        Vec4f tright;
+        glm::vec4 tright;
         tright.x = tleft.x + chr->width;
         tright.y = tleft.y;
         tright.z = (f32)(chr->x + chr->width) / img_width;
         tright.w = (f32)(img_height - chr->y) / img_height;
-        Vec4f bright;
+        glm::vec4 bright;
         bright.x = bleft.x + chr->width;
         bright.y = bleft.y;
         bright.z = (f32)(chr->x + chr->width) / img_width;
@@ -99,7 +102,7 @@ vx::UIManager::render_text(const char* str, Vec2f start, f32 scale)
     glBindVertexArray(this->vao);
     glBindBuffer(GL_ARRAY_BUFFER, this->fntfile_vbo);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4f) * v, vertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * v, vertices, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
 
@@ -107,11 +110,11 @@ vx::UIManager::render_text(const char* str, Vec2f start, f32 scale)
     glActiveTexture(GL_TEXTURE0);
     glUseProgram(this->shader->program);
 
-    Mat4x4f translationOrigin = um::make_translation(Mat4x4f(1.0f), Vec3f(-start.x, -start.y, 0.0f));
-    Mat4x4f scaling = um::make_scale(translationOrigin, Vec3f(scale, scale, 0.0f));
-    Mat4x4f model = um::make_translation(scaling, Vec3f(start.x, start.y, 0.0f));
+    glm::mat4 translationOrigin = glm::translate(glm::mat4(1.0f), glm::vec3(-start.x, -start.y, 0.0f));
+    glm::mat4 scaling = glm::scale(translationOrigin, glm::vec3(scale, scale, 0.0f));
+    glm::mat4 model = glm::translate(scaling, glm::vec3(start.x, start.y, 0.0f));
 
-    glUniformMatrix4fv(this->shader->uniform_location("model"), 1, GL_FALSE, &model.m00);
+    glUniformMatrix4fv(this->shader->uniform_location("model"), 1, GL_FALSE, glm::value_ptr(model));
     // Mainly used for text rendering
 
     // Draw all of the triangles for the characters.
