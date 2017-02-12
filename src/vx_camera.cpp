@@ -31,7 +31,7 @@ update_frustum_points(vx::Frustum& frustum)
 }
 
 vx::Camera::Camera(glm::vec3 position, f32 fovy, f32 yaw, f32 pitch, glm::vec3 up_world, f32 ratio,
-                   f32 znear, f32 zfar, f32 move_speed, f32 turn_speed)
+                   f32 move_speed, f32 turn_speed)
     : yaw(yaw)
     , pitch(pitch)
     , up_world(up_world)
@@ -41,9 +41,9 @@ vx::Camera::Camera(glm::vec3 position, f32 fovy, f32 yaw, f32 pitch, glm::vec3 u
     frustum.position = position;
     frustum.ratio = ratio;
     frustum.fovy = fovy;
-    frustum.znear = znear;
-    frustum.zfar = zfar;
-    frustum.projection = glm::perspective(glm::radians(fovy), ratio, znear, zfar);
+    frustum.znear = ZNEAR;
+    frustum.zfar = ZFAR;
+    frustum.projection = glm::perspective(glm::radians(fovy), ratio, ZNEAR, ZFAR);
 
     update_frustum_orientation(frustum, yaw, pitch, up_world);
     update_frustum_points(frustum);

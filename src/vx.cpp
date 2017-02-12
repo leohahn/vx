@@ -61,12 +61,16 @@ vx::main_update(vx::Memory& mem, vx::Camera& camera, bool* keyboard, f64 delta)
     {
         mem.depth_buf->draw_to_image("depth_buffer.tga");
     }
+    // if (keyboard[GLFW_KEY_P] == GLFW_PRESS)
+    // {
+
+    // }
 }
 
 void
 vx::main_render(vx::Memory& mem, vx::Camera& camera, bool* keyboard)
 {
-    glm::mat4 view = camera.view_matrix();
+    glm::mat4 view(camera.view_matrix());
 
     // std::cout << glm::to_string(view) << std::endl;
 
@@ -101,15 +105,13 @@ vx::main_render(vx::Memory& mem, vx::Camera& camera, bool* keyboard)
                 for (i32 x = 0; x < vx::WORLD_SIZE; x++)
                 {
                     if (mem.chunk_manager->chunks[x][y][z].num_blocks == 0) continue;
-                    printf("\nCallin DRAW OCCLUDERS FOR CHUNK %d %d %d\n", x, y, z);
+                    // printf("\nCallin DRAW OCCLUDERS FOR CHUNK %d %d %d\n", x, y, z);
                     mem.depth_buf->draw_occluders(camera.frustum, mem.chunk_manager->chunks[x][y][z].occluders);
                 }
         mem.chunk_manager->render_chunks(camera.frustum, view, mem, keyboard);
     }
 
-    // Render to the screen
-    // TODO: Optimize this
-    // TODO: Abstract the ui into something more pleasant
+    // @Cleanup, TODO: Optimize this, TODO: Abstract the ui into something more pleasant
     /* BEGIN_TIMED_BLOCK(DebugCycleCount_RenderText); */
     mem.ui_manager->render_text(mem.log_manager->camera, glm::vec2(10.0f, 60.0f), 0.5f);
     mem.ui_manager->render_text(mem.log_manager->fps, glm::vec2(10.0f, 20.0f), 0.5f);

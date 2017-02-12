@@ -65,8 +65,6 @@ main(void)
     // Camera
     // -------------------------
     constexpr f32 SCREEN_RATIO = static_cast<f32>(SCREEN_WIDTH) / SCREEN_HEIGHT;
-    f32 ZNEAR = 0.1f;
-    f32 ZFAR = 600.0f;
     f32 FOVY = 75.0f;
     f32 YAW = -90.0f;
     f32 PITCH = 0.0f;
@@ -75,8 +73,8 @@ main(void)
     f32 CAMERA_MOVE_SPEED = 0.2f;
     f32 CAMERA_TURN_SPEED = 1.0f;
 
-    vx::Camera camera(CAMERA_POSITION, FOVY, YAW, PITCH, WORLD_UP, SCREEN_RATIO,
-                      ZNEAR, ZFAR, CAMERA_MOVE_SPEED, CAMERA_TURN_SPEED);
+    vx::Camera camera(CAMERA_POSITION, FOVY, YAW, PITCH, WORLD_UP,
+                      SCREEN_RATIO, CAMERA_MOVE_SPEED, CAMERA_TURN_SPEED);
 
     // -------------------------
     // Shaders
