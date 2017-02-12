@@ -1,6 +1,10 @@
 #include "vx_depth_buffer_rasterizer.hpp"
+#include <math.h>
 #include <stdio.h>
+#include "glm/glm.hpp"
 #include "um_image.hpp"
+#include "vx_frustum.hpp"
+#include <cfloat>
 
 bool
 is_top_or_left_edge(const vx::Point3& a, const vx::Point3& b)
@@ -11,9 +15,39 @@ is_top_or_left_edge(const vx::Point3& a, const vx::Point3& b)
 }
 
 i32
-orient2d(const vx::Point3& a, const vx::Point3& b, const vx::Point3& c)
+orient2d(const vx::Point3* a, const vx::Point3* b, const vx::Point3* c)
 {
-    return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);
+    return (b->x - a->x)*(c->y - a->y) - (b->y - a->y)*(c->x - a->x);
+}
+
+void
+sort_in_counter_clockwise_order(vx::Point3* v0, vx::Point3* v1, vx::Point3* v2)
+{
+    // @TODO(Leo): Test to see if this really works as I plan.
+
+    if (orient2d(v0, v1, v2) > 0)
+    {
+        // Points are already in counter clockwise order.
+        return;
+    }
+    // If the orient2d is negative, it means that they are on clockwise order.
+    // Swapping v0 and v1 makes the triangles be on counter clockwise order.
+    vx::Point3* temp = v0;
+    v0 = v1;
+    v1 = temp;
+    return;
+}
+
+vx::Point3
+vx::Point3::from_vec(const glm::vec4& v)
+{
+    return Point3(floor(v.x), floor(v.y), floor(v.z));
+}
+
+vx::Point3
+vx::Point3::from_vec(const glm::vec3& v)
+{
+    return Point3(floor(v.x), floor(v.y), floor(v.z));
 }
 
 vx::DepthBufferRasterizer::DepthBufferRasterizer(i16 width, i16 height)
@@ -21,11 +55,20 @@ vx::DepthBufferRasterizer::DepthBufferRasterizer(i16 width, i16 height)
     , _height(height)
 {
     _buf = new f32[width * height];
+    clear_buffer();
 }
 
 vx::DepthBufferRasterizer::~DepthBufferRasterizer()
 {
     delete[] _buf;
+}
+
+void
+vx::DepthBufferRasterizer::clear_buffer()
+{
+    u32 num_pixels = _width * _height;
+    for (u32 i = 0; i < num_pixels; i++)
+        _buf[i] = FLT_MAX;
 }
 
 void
@@ -45,12 +88,11 @@ vx::DepthBufferRasterizer::draw_to_image(const char* filename) const
 }
 
 void
-vx::DepthBufferRasterizer::draw_occluders(Quad3* occluders[vx::FACE_COUNT])
+vx::DepthBufferRasterizer::draw_occluders(const Frustum& frustum, Quad3* occluders[vx::FACE_COUNT])
 {
-    // using vec3 = glm::vec3;
-    // using vec4 = glm::vec4;
-    // using mat4 = glm::mat4;
-    // @Speed, this is probably not optimal, compute this only one time per frame.
+    using vec3 = glm::vec3;
+    using vec4 = glm::vec4;
+    using mat4 = glm::mat4;
 
     for (u32 i = 0; i < vx::FACE_COUNT; i++)
     {
@@ -60,23 +102,32 @@ vx::DepthBufferRasterizer::draw_occluders(Quad3* occluders[vx::FACE_COUNT])
         // screen_space.x = camera_space.x / camera_space.z
         // screen_space.y = camera_space.y / camera_space.z
 
-        // vec3 transformed_p1 = _view * vec4(occluders[i]->p1, 1.0f);
-        // vec3 transformed_p2 = _view * vec4(occluders[i]->p2, 1.0f);
-        // vec3 transformed_p3 = _view * vec4(occluders[i]->p3, 1.0f);
-        // vec3 transformed_p4 = _view * vec4(occluders[i]->p4, 1.0f);
+        mat4 proj_view = _proj * _view;
 
-        if (i == vx::FACE_FRONT)
-        {
-            // printf("FACE FRONT\n");
-            // printf("world_p1: x = %.2f y = %.2f z = %.2f\n",
-            //        occluders[i]->p1.x, occluders[i]->p1.y, occluders[i]->p1.z);
-            // printf("transformed_p1: x = %.2f y = %.2f z = %.2f\n",
-            //        transformed_p1.x, transformed_p1.y, transformed_p1.z);
-            // printf("screen_p1: x = %.2f y = %.2f z = %.2f\n",
-            //        transformed_p1.x/transformed_p1.z,
-            //        transformed_p1.y/transformed_p1.z,
-            //        transformed_p1.z);
-        }
+        vec4 raster_p1 = proj_view * vec4(occluders[i]->p1, 1.0f);
+        vec4 raster_p2 = proj_view * vec4(occluders[i]->p2, 1.0f);
+        vec4 raster_p3 = proj_view * vec4(occluders[i]->p3, 1.0f);
+        vec4 raster_p4 = proj_view * vec4(occluders[i]->p4, 1.0f);
+
+        Point3 p1;
+        p1.x = floor(_width * raster_p1.x / raster_p1.w);
+        p1.y = floor(_height * raster_p1.y / raster_p1.w);
+        p1.z = raster_p1.z;
+        Point3 p2;
+        p2.x = floor(_width * raster_p2.x / raster_p2.w);
+        p2.y = floor(_height * raster_p2.y / raster_p2.w);
+        p2.z = raster_p2.z;
+        Point3 p3;
+        p3.x = floor(_width * raster_p3.x / raster_p3.w);
+        p3.y = floor(_height * raster_p3.y / raster_p3.w);
+        p3.z = raster_p3.z;
+        Point3 p4;
+        p4.x = floor(_width * raster_p4.x / raster_p4.w);
+        p4.y = floor(_height * raster_p4.y / raster_p4.w);
+        p4.z = raster_p4.z;
+
+        draw_triangle(p1, p2, p3);
+        draw_triangle(p3, p4, p1);
     }
 }
 
@@ -88,18 +139,27 @@ vx::DepthBufferRasterizer::render_pixel(const Point3& p, i32 w0, i32 w1, i32 w2)
 }
 
 void
-vx::DepthBufferRasterizer::draw_triangle(const Point3& v0, const Point3& v1, const Point3& v2)
+vx::DepthBufferRasterizer::draw_triangle(Point3 unsorted_v0, Point3 unsorted_v1, Point3 unsorted_v2)
 {
     // NOTE(Leo): A triangle follows the convention that is defined in counter clockwise fashion.
     // This is important by defining the edges of a triangle.
     // For example, a left edge is always an edge that is going down. I.e, the start point is
     // always above the end point. (in the y axis)
 
+    // We sort the points making v0 always be the smaller point on the x coordinate, and v1 the largest.
+    Point3* v0 = &unsorted_v0;
+    Point3* v1 = &unsorted_v1;
+    Point3* v2 = &unsorted_v2;
+    // @Speed: This can be improved by pre-sorting these vertices in a smarter way, and not at
+    // the last time.
+    sort_in_counter_clockwise_order(v0, v1, v2);
+
+
     // Compute triangle bounding box
-    i32 minx = um::min3(v0.x, v1.x, v2.x);
-    i32 miny = um::min3(v0.y, v1.y, v2.y);
-    i32 maxx = um::max3(v0.x, v1.x, v2.x);
-    i32 maxy = um::max3(v0.y, v1.y, v2.y);
+    i32 minx = um::min3(v0->x, v1->x, v2->x);
+    i32 miny = um::min3(v0->y, v1->y, v2->y);
+    i32 maxx = um::max3(v0->x, v1->x, v2->x);
+    i32 maxy = um::max3(v0->y, v1->y, v2->y);
 
     // Clip against screen bounds
     minx = MAX(minx, 0);
@@ -108,15 +168,15 @@ vx::DepthBufferRasterizer::draw_triangle(const Point3& v0, const Point3& v1, con
     maxy = MIN(maxy, _height-1);
 
     // Triangle setup
-    i32 A01 = v0.y - v1.y, B01 = v1.x - v0.x;
-    i32 A12 = v1.y - v2.y, B12 = v2.x - v1.x;
-    i32 A20 = v2.y - v0.y, B20 = v0.x - v2.x;
+    i32 A01 = v0->y - v1->y, B01 = v1->x - v0->x;
+    i32 A12 = v1->y - v2->y, B12 = v2->x - v1->x;
+    i32 A20 = v2->y - v0->y, B20 = v0->x - v2->x;
 
     // Barycentric coordinates at minX/minY corner
     Point3 p = { minx, miny, 0 };
-    i32 w0_row = orient2d(v1, v2, p);
-    i32 w1_row = orient2d(v2, v0, p);
-    i32 w2_row = orient2d(v0, v1, p);
+    i32 w0_row = orient2d(v1, v2, &p);
+    i32 w1_row = orient2d(v2, v0, &p);
+    i32 w2_row = orient2d(v0, v1, &p);
     i32 area = w0_row + w1_row + w2_row;
 
     // printf("AREA IS: %d\n", area);
@@ -133,7 +193,7 @@ vx::DepthBufferRasterizer::draw_triangle(const Point3& v0, const Point3& v1, con
             // If p is on or inside all edges, render pixel
             if ((w0 | w1 | w2) >= 0)
             {
-                i32 depth = ((v0.z * w0) + (v1.z * w1) + (v2.z * w2))/area;
+                i32 depth = ((v0->z * w0) + (v1->z * w1) + (v2->z * w2))/area;
                 p.z = depth;
                 // printf("depth: %d\n", depth);
                 render_pixel(p, w0, w1, w2);

@@ -59,10 +59,7 @@ vx::main_update(vx::Memory& mem, vx::Camera& camera, bool* keyboard, f64 delta)
     }
     if (keyboard[GLFW_KEY_P] == GLFW_PRESS)
     {
-        // mem.depth_buf->draw_triangle(Vec3f(0.0f, 0.0f, -1.0f),
-        //                               Vec3f(0.5f, 0.5f, -1.0f),
-        //                               Vec3f(-0.5f, -0.5f, 0.0f));
-        // mem.depth_buf->draw_to_file("depth_buffer.tga");
+        mem.depth_buf->draw_to_image("depth_buffer.tga");
     }
 }
 
@@ -97,13 +94,15 @@ vx::main_render(vx::Memory& mem, vx::Camera& camera, bool* keyboard)
     else
     {
         mem.depth_buf->set_view_matrix(view);
+        mem.depth_buf->clear_buffer();
+
         for (i32 z = 0; z < vx::WORLD_SIZE; z++)
             for (i32 y = 0; y < vx::WORLD_SIZE; y++)
                 for (i32 x = 0; x < vx::WORLD_SIZE; x++)
                 {
                     if (mem.chunk_manager->chunks[x][y][z].num_blocks == 0) continue;
-                    // printf("\nCallin DRAW OCCLUDERS FOR CHUNK %d %d %d\n", x, y, z);
-                    mem.depth_buf->draw_occluders(mem.chunk_manager->chunks[x][y][z].occluders);
+                    printf("\nCallin DRAW OCCLUDERS FOR CHUNK %d %d %d\n", x, y, z);
+                    mem.depth_buf->draw_occluders(camera.frustum, mem.chunk_manager->chunks[x][y][z].occluders);
                 }
         mem.chunk_manager->render_chunks(camera.frustum, view, mem, keyboard);
     }
@@ -112,7 +111,7 @@ vx::main_render(vx::Memory& mem, vx::Camera& camera, bool* keyboard)
     // TODO: Optimize this
     // TODO: Abstract the ui into something more pleasant
     /* BEGIN_TIMED_BLOCK(DebugCycleCount_RenderText); */
-    // mem.ui_manager->render_text(mem.log_manager->camera, glm::vec2(10.0f, 60.0f), 0.5f);
-    // mem.ui_manager->render_text(mem.log_manager->fps, glm::vec2(10.0f, 20.0f), 0.5f);
+    mem.ui_manager->render_text(mem.log_manager->camera, glm::vec2(10.0f, 60.0f), 0.5f);
+    mem.ui_manager->render_text(mem.log_manager->fps, glm::vec2(10.0f, 20.0f), 0.5f);
     /* END_TIMED_BLOCK(DebugCycleCount_RenderText); */
 }

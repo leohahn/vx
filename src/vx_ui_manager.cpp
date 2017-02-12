@@ -47,7 +47,7 @@ vx::UIManager::render_text(const char* str, glm::vec2 start, f32 scale)
 {
     const u64 img_width = this->fntfile->image_width;
     const u64 img_height = this->fntfile->image_height;
-    glm::vec2 cursor = start;
+    glm::vec2 cursor(start);
     u32 v = 0;
     u32 textLen = 0;
     vx::FntChar* chr;
@@ -110,9 +110,11 @@ vx::UIManager::render_text(const char* str, glm::vec2 start, f32 scale)
     glActiveTexture(GL_TEXTURE0);
     glUseProgram(this->shader->program);
 
-    glm::mat4 translationOrigin = glm::translate(glm::mat4(1.0f), glm::vec3(-start.x, -start.y, 0.0f));
-    glm::mat4 scaling = glm::scale(translationOrigin, glm::vec3(scale, scale, 0.0f));
-    glm::mat4 model = glm::translate(scaling, glm::vec3(start.x, start.y, 0.0f));
+    // @Speed: This is probably not so fast.
+    glm::mat4 model;
+    model = glm::translate(model, glm::vec3(start.x, start.y, 0.0f));
+    model = glm::scale(model, glm::vec3(scale, scale, 0.0f));
+    model = glm::translate(model, glm::vec3(-start.x, -start.y, 0.0f));
 
     glUniformMatrix4fv(this->shader->uniform_location("model"), 1, GL_FALSE, glm::value_ptr(model));
     // Mainly used for text rendering

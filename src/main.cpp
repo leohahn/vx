@@ -70,7 +70,7 @@ main(void)
     f32 FOVY = 75.0f;
     f32 YAW = -90.0f;
     f32 PITCH = 0.0f;
-    glm::vec3 CAMERA_POSITION(15.0f, 35.0f, 120.0f);
+    glm::vec3 CAMERA_POSITION(15.0f, 25.0f, 70.0f);
     glm::vec3 WORLD_UP(0.0f, 1.0f, 0.0f);
     f32 CAMERA_MOVE_SPEED = 0.2f;
     f32 CAMERA_TURN_SPEED = 1.0f;
