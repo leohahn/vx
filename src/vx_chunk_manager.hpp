@@ -22,14 +22,24 @@ enum Face
     FACE_BACK, FACE_FRONT, FACE_RIGHT, FACE_LEFT, FACE_UP, FACE_DOWN, FACE_COUNT
 };
 
+static constexpr glm::vec3 FACE_NORMALS[6] =
+{
+    glm::vec3( 0.0f,  0.0f, -1.0f),
+    glm::vec3( 0.0f,  0.0f,  1.0f),
+    glm::vec3( 1.0f,  0.0f,  0.0f),
+    glm::vec3(-1.0f,  0.0f,  0.0f),
+    glm::vec3( 0.0f,  1.0f, -1.0f),
+    glm::vec3( 0.0f, -1.0f, -1.0f),
+};
+
 struct Block
 {
     bool exists;
 };
 
-constexpr u8 WORLD_SIZE = 8;
-constexpr u8 CHUNK_SIZE = 32;
-constexpr u8 BLOCK_SIZE = 1;
+static constexpr u8 WORLD_SIZE = 8;
+static constexpr u8 CHUNK_SIZE = 32;
+static constexpr u8 BLOCK_SIZE = 1;
 
 struct Chunk
 {

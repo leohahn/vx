@@ -424,7 +424,7 @@ vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* s
                 //     blockPosition.x,
                 //     blockPosition.y,
                 //     blockPosition.z, 0.05, 2.0, 0.25, ctx);
-                // bool exists = noise > 0.2 ? false : true;
+                // bool exists = noise > 0.1 ? false : true;
                 bool exists = true;
 
                 /* bool exists = (rand() % 20) > 10 ? true : false; */
@@ -441,8 +441,11 @@ vx::ChunkManager::create_chunk(u32 chunkX, u32 chunkY, u32 chunkZ, vx::Shader* s
             }
         }
     }
-    this->chunks[chunkX][chunkY][chunkZ].blocks[CHUNK_SIZE-1][CHUNK_SIZE-1][CHUNK_SIZE-1].exists = false;
-    num_blocks--;
+    // for (i32 i = CHUNK_SIZE-1; i >= 0; i--)
+    // {
+    //     this->chunks[chunkX][chunkY][chunkZ].blocks[i][CHUNK_SIZE-1][CHUNK_SIZE-1].exists = false;
+    //     num_blocks--;
+    // }
 
     this->chunks[chunkX][chunkY][chunkZ].num_blocks = num_blocks;
 

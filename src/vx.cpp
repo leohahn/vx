@@ -104,9 +104,9 @@ vx::main_render(vx::Memory& mem, vx::Camera& camera, bool* keyboard)
             for (i32 y = 0; y < vx::WORLD_SIZE; y++)
                 for (i32 x = 0; x < vx::WORLD_SIZE; x++)
                 {
-                    if (mem.chunk_manager->chunks[x][y][z].num_blocks == 0) continue;
-                    // printf("\nCallin DRAW OCCLUDERS FOR CHUNK %d %d %d\n", x, y, z);
-                    mem.depth_buf->draw_occluders(camera.frustum, mem.chunk_manager->chunks[x][y][z].occluders);
+                    vx::Chunk& chunk = mem.chunk_manager->chunks[x][y][z];
+                    if (chunk.num_blocks == 0) continue;
+                    mem.depth_buf->draw_occluders(camera.frustum, chunk.occluders);
                 }
         mem.chunk_manager->render_chunks(camera.frustum, view, mem, keyboard);
     }

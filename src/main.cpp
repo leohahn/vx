@@ -126,12 +126,12 @@ main(void)
     // Chunks
     // -------------------------
     auto* chunk_manager = new vx::ChunkManager();
-    /* for (i32 x = 0; x < WORLD_SIZE; x++) */
-    /*     for (i32 y = 0; y < WORLD_SIZE-5; y++) */
-    /*         for (i32 z = 0; z < WORLD_SIZE; z++) */
-    /*         { */
-    /*             vx_chunk_manager_CreateChunk(chunkManager, x, y, z, globalShader, material); */
-    /*         } */
+    // for (i32 x = 0; x < vx::WORLD_SIZE; x++)
+    //     for (i32 y = 0; y < vx::WORLD_SIZE-5; y++)
+    //         for (i32 z = 0; z < vx::WORLD_SIZE; z++)
+    //         {
+    //             chunk_manager->create_chunk(x, y, z, global_shader, material);
+    //         }
     chunk_manager->create_chunk(0, 0, 0, global_shader, material);
     /* vx_chunk_manager_CreateChunk(chunkManager, 1, 0, 0, globalShader, material); */
     /* vx_chunk_manager_CreateChunk(chunkManager, 2, 0, 0, globalShader, material); */

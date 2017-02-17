@@ -1,4 +1,5 @@
 #include "vx_depth_buffer_rasterizer.hpp"
+#include <algorithm>
 #include <math.h>
 #include <stdio.h>
 #include "glm/glm.hpp"
@@ -19,23 +20,6 @@ i32
 orient2d(const vx::Point3* a, const vx::Point3* b, const vx::Point3* c)
 {
     return (b->x - a->x)*(c->y - a->y) - (b->y - a->y)*(c->x - a->x);
-}
-
-void
-sort_in_counter_clockwise_order(vx::Point3* v0, vx::Point3* v1, vx::Point3* v2)
-{
-    // @TODO(Leo): Test to see if this really works as I plan.
-
-    if (orient2d(v0, v1, v2) > 0)
-    {
-        // Points are already in counter clockwise order.
-        return;
-    }
-    // If the orient2d is negative, it means that they are on clockwise order.
-    // Swapping v0 and v1 makes the triangles be on counter clockwise order.
-    vx::Point3* temp = v0;
-    v0 = v1;
-    v1 = temp;
 }
 
 vx::Point3
@@ -98,9 +82,6 @@ vx::DepthBufferRasterizer::draw_to_image(const char* filename) const
 
             ASSERT(depth <= 255);
 
-            if (depth > 0)
-                printf("Printing depth %d\n", depth);
-
             if (_buf[index] == ZFAR)
             {
                 image.set(i, j, 0);
@@ -134,68 +115,56 @@ vx::DepthBufferRasterizer::draw_occluders(const Frustum& frustum, Quad3* occlude
 
         mat4 proj_view = _proj * _view;
 
+        // TODO(Leo): I have to clip the coordinates
         vec4 clip_p1 = proj_view * vec4(occluders[i]->p1, 1.0f);
         vec4 clip_p2 = proj_view * vec4(occluders[i]->p2, 1.0f);
         vec4 clip_p3 = proj_view * vec4(occluders[i]->p3, 1.0f);
         vec4 clip_p4 = proj_view * vec4(occluders[i]->p4, 1.0f);
 
+        ASSERT(clip_p1.w != 0 && clip_p2.w != 0 && clip_p3.w != 0 && clip_p4.w != 0);
+
         // Transform the coordinates in x y from [-1, 1] to [0, 1]
         vec2 norm_xy_raster_p1 = ((vec2(clip_p1) / clip_p1.w) + vec2(1.0f)) / 2.0f;
         vec2 norm_xy_raster_p2 = ((vec2(clip_p2) / clip_p2.w) + vec2(1.0f)) / 2.0f;
-        vec2 norm_xy_raster_p3 = ((vec2(clip_p2) / clip_p2.w) + vec2(1.0f)) / 2.0f;
-        vec2 norm_xy_raster_p4 = ((vec2(clip_p2) / clip_p2.w) + vec2(1.0f)) / 2.0f;
+        vec2 norm_xy_raster_p3 = ((vec2(clip_p3) / clip_p3.w) + vec2(1.0f)) / 2.0f;
+        vec2 norm_xy_raster_p4 = ((vec2(clip_p4) / clip_p4.w) + vec2(1.0f)) / 2.0f;
 
         if (i == vx::FACE_FRONT)
         {
-            printf("\nWORLD: %.2f %.2f %.2f\n", occluders[i]->p1.x, occluders[i]->p1.y, occluders[i]->p1.z);
+            // printf("\nWORLD: %.2f %.2f %.2f\n", occluders[i]->p1.x, occluders[i]->p1.y, occluders[i]->p1.z);
 
-            printf("clip:\n");
-            printf("p1: %.2f %.2f %.2f %.2f\n", clip_p1.x, clip_p1.y, clip_p1.z, clip_p1.w);
+            // printf("clip:\n");
+            // printf("p1: %.2f %.2f %.2f %.2f\n", clip_p1.x, clip_p1.y, clip_p1.z, clip_p1.w);
 
-            printf("Perspective divide:\n");
-            printf("p1: %.2f %.2f %.2f\n", norm_xy_raster_p1.x, norm_xy_raster_p1.y, clip_p1.z);
-            // printf("p2: %d %d %.2f\n", p2.x, p2.y, p2.z);
-            // printf("p3: %d %d %.2f\n", p3.x, p3.y, p3.z);
-
-            // printf("Triangle 2\n");
-            // printf("p3: %d %d %.2f\n", p3.x, p3.y, p3.z);
-            // printf("p4: %d %d %.2f\n", p4.x, p4.y, p4.z);
-            // printf("p1: %d %d %.2f\n", p1.x, p1.y, p1.z);
+            // printf("Perspective divide:\n");
+            // printf("p1: %.2f %.2f %.2f\n", norm_xy_raster_p1.x, norm_xy_raster_p1.y, clip_p1.z);
+            // TODO: FINISH THISSS
         }
 
-        // Point3 p1;
-        // p1.x = floor(_width * raster_p1.x / raster_p1.w);
-        // p1.y = floor(_height * raster_p1.y / raster_p1.w);
-        // p1.z = raster_p1.z;
-        // Point3 p2;
-        // p2.x = floor(_width * raster_p2.x / raster_p2.w);
-        // p2.y = floor(_height * raster_p2.y / raster_p2.w);
-        // p2.z = raster_p2.z;
-        // Point3 p3;
-        // p3.x = floor(_width * raster_p3.x / raster_p3.w);
-        // p3.y = floor(_height * raster_p3.y / raster_p3.w);
-        // p3.z = raster_p3.z;
-        // Point3 p4;
-        // p4.x = floor(_width * raster_p4.x / raster_p4.w);
-        // p4.y = floor(_height * raster_p4.y / raster_p4.w);
-        // p4.z = raster_p4.z;
+        Point3 p1;
+        p1.x = floor(_width * norm_xy_raster_p1.x);
+        p1.y = floor(_height * norm_xy_raster_p1.y);
+        p1.z = clip_p1.z;
+        Point3 p2;
+        p2.x = floor(_width * norm_xy_raster_p2.x);
+        p2.y = floor(_height * norm_xy_raster_p2.y);
+        p2.z = clip_p2.z;
+        Point3 p3;
+        p3.x = floor(_width * norm_xy_raster_p3.x);
+        p3.y = floor(_height * norm_xy_raster_p3.y);
+        p3.z = clip_p3.z;
+        Point3 p4;
+        p4.x = floor(_width * norm_xy_raster_p4.x);
+        p4.y = floor(_height * norm_xy_raster_p4.y);
+        p4.z = clip_p4.z;
 
-        // if (i == vx::FACE_FRONT)
-        // {
-        //     printf("Drawing occluders\n");
-        //     printf("Triangle 1\n");
-        //     printf("p1: %d %d %.2f\n", p1.x, p1.y, p1.z);
-        //     printf("p2: %d %d %.2f\n", p2.x, p2.y, p2.z);
-        //     printf("p3: %d %d %.2f\n", p3.x, p3.y, p3.z);
+        if (glm::dot(vx::FACE_NORMALS[i], frustum.front) == 0)
+        {
+            printf("DOT IS ZERO BROOOO\n");
+        }
 
-        //     printf("Triangle 2\n");
-        //     printf("p3: %d %d %.2f\n", p3.x, p3.y, p3.z);
-        //     printf("p4: %d %d %.2f\n", p4.x, p4.y, p4.z);
-        //     printf("p1: %d %d %.2f\n", p1.x, p1.y, p1.z);
-
-        //     draw_triangle(p1, p2, p3);
-        //     draw_triangle(p3, p4, p1);
-        // }
+        draw_triangle(p1, p3, p2);
+        draw_triangle(p2, p4, p1);
     }
 }
 
@@ -221,9 +190,19 @@ vx::DepthBufferRasterizer::draw_triangle(Point3 unsorted_v0, Point3 unsorted_v1,
     Point3* v0 = &unsorted_v0;
     Point3* v1 = &unsorted_v1;
     Point3* v2 = &unsorted_v2;
-    // @Speed: This can be improved by pre-sorting these vertices in a smarter way, and not at
-    // the last time.
-    sort_in_counter_clockwise_order(v0, v1, v2);
+
+    // If the triangle is on clockwise order, swap first 2 vertices.
+    if (orient2d(v0, v1, v2) < 0)
+    {
+        std::swap(v0, v1);
+    }
+
+    ASSERT(orient2d(v0, v1, v2) >= 0);
+
+    // printf("Drawing TRIANGLE for points:\n");
+    // printf("v0: %d, %d, %.2f\n", v0->x, v0->y, v0->z);
+    // printf("v1: %d, %d, %.2f\n", v1->x, v1->y, v1->z);
+    // printf("v2: %d, %d, %.2f\n", v2->x, v2->y, v2->z);
 
     i32 minx = um::min3(v0->x, v1->x, v2->x);
     i32 miny = um::min3(v0->y, v1->y, v2->y);
@@ -235,6 +214,9 @@ vx::DepthBufferRasterizer::draw_triangle(Point3 unsorted_v0, Point3 unsorted_v1,
     miny = MAX(miny, 0);
     maxx = MIN(maxx, _width-1);
     maxy = MIN(maxy, _height-1);
+
+    // printf("minx, miny = %d, %d\n", minx, miny);
+    // printf("maxx, maxy = %d, %d\n", maxx, maxy);
 
     // Triangle setup
     i32 A01 = v0->y - v1->y, B01 = v1->x - v0->x;
@@ -262,7 +244,6 @@ vx::DepthBufferRasterizer::draw_triangle(Point3 unsorted_v0, Point3 unsorted_v1,
             {
                 i32 depth = ((v0->z * w0) + (v1->z * w1) + (v2->z * w2))/area;
                 p.z = depth;
-                // printf("depth: %d\n", depth);
                 render_pixel(p, w0, w1, w2);
             }
 
