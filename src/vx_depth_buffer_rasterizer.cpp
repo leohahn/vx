@@ -75,21 +75,16 @@ vx::DepthBufferRasterizer::draw_to_image(const char* filename) const
 
             f32 normalized_depth = ((ZFAR - _buf[index]) - ZNEAR) / (ZFAR - ZNEAR);
 
-            // if (normalized_depth > 0.0f)
-            //     printf("Printing depth %.2f\n", normalized_depth);
+            if (normalized_depth < 1 && normalized_depth > 0)
+            {
+                printf("Printing normalized depth: %.2f\n", normalized_depth);
+            }
 
             u8 depth = (u8)(normalized_depth * 255.0f);
 
             ASSERT(depth <= 255);
 
-            if (_buf[index] == ZFAR)
-            {
-                image.set(i, j, 0);
-            }
-            else
-            {
-                image.set(i, j, 255);
-            }
+            image.set(i, j, depth);
         }
 
     image.write_to_file(filename);
@@ -113,13 +108,16 @@ vx::DepthBufferRasterizer::draw_occluders(const Frustum& frustum, Quad3* occlude
         // screen_space.x = camera_space.x / camera_space.z
         // screen_space.y = camera_space.y / camera_space.z
 
-        mat4 proj_view = _proj * _view;
+        vec4 camera_p1 = _view * vec4(occluders[i]->p1, 1.0f);
+        vec4 camera_p2 = _view * vec4(occluders[i]->p2, 1.0f);
+        vec4 camera_p3 = _view * vec4(occluders[i]->p3, 1.0f);
+        vec4 camera_p4 = _view * vec4(occluders[i]->p4, 1.0f);
 
         // TODO(Leo): I have to clip the coordinates
-        vec4 clip_p1 = proj_view * vec4(occluders[i]->p1, 1.0f);
-        vec4 clip_p2 = proj_view * vec4(occluders[i]->p2, 1.0f);
-        vec4 clip_p3 = proj_view * vec4(occluders[i]->p3, 1.0f);
-        vec4 clip_p4 = proj_view * vec4(occluders[i]->p4, 1.0f);
+        vec4 clip_p1 = _proj * camera_p1;
+        vec4 clip_p2 = _proj * camera_p2;
+        vec4 clip_p3 = _proj * camera_p3;
+        vec4 clip_p4 = _proj * camera_p4;
 
         ASSERT(clip_p1.w != 0 && clip_p2.w != 0 && clip_p3.w != 0 && clip_p4.w != 0);
 
@@ -129,39 +127,22 @@ vx::DepthBufferRasterizer::draw_occluders(const Frustum& frustum, Quad3* occlude
         vec2 norm_xy_raster_p3 = ((vec2(clip_p3) / clip_p3.w) + vec2(1.0f)) / 2.0f;
         vec2 norm_xy_raster_p4 = ((vec2(clip_p4) / clip_p4.w) + vec2(1.0f)) / 2.0f;
 
-        if (i == vx::FACE_FRONT)
-        {
-            // printf("\nWORLD: %.2f %.2f %.2f\n", occluders[i]->p1.x, occluders[i]->p1.y, occluders[i]->p1.z);
-
-            // printf("clip:\n");
-            // printf("p1: %.2f %.2f %.2f %.2f\n", clip_p1.x, clip_p1.y, clip_p1.z, clip_p1.w);
-
-            // printf("Perspective divide:\n");
-            // printf("p1: %.2f %.2f %.2f\n", norm_xy_raster_p1.x, norm_xy_raster_p1.y, clip_p1.z);
-            // TODO: FINISH THISSS
-        }
-
         Point3 p1;
         p1.x = floor(_width * norm_xy_raster_p1.x);
         p1.y = floor(_height * norm_xy_raster_p1.y);
-        p1.z = clip_p1.z;
+        p1.z = -camera_p1.z;
         Point3 p2;
         p2.x = floor(_width * norm_xy_raster_p2.x);
         p2.y = floor(_height * norm_xy_raster_p2.y);
-        p2.z = clip_p2.z;
+        p2.z = -camera_p2.z;
         Point3 p3;
         p3.x = floor(_width * norm_xy_raster_p3.x);
         p3.y = floor(_height * norm_xy_raster_p3.y);
-        p3.z = clip_p3.z;
+        p3.z = -camera_p3.z;
         Point3 p4;
         p4.x = floor(_width * norm_xy_raster_p4.x);
         p4.y = floor(_height * norm_xy_raster_p4.y);
-        p4.z = clip_p4.z;
-
-        if (glm::dot(vx::FACE_NORMALS[i], frustum.front) == 0)
-        {
-            printf("DOT IS ZERO BROOOO\n");
-        }
+        p4.z = -camera_p4.z;
 
         draw_triangle(p1, p3, p2);
         draw_triangle(p2, p4, p1);
@@ -172,6 +153,7 @@ void
 vx::DepthBufferRasterizer::render_pixel(const Point3& p, i32 w0, i32 w1, i32 w2)
 {
     u32 index = (p.y * _width) + p.x;
+    if (_buf[index] < p.z) return;
     _buf[index] = p.z;
 }
 
@@ -182,15 +164,12 @@ vx::DepthBufferRasterizer::draw_triangle(Point3 unsorted_v0, Point3 unsorted_v1,
     // This is important by defining the edges of a triangle.
     // For example, a left edge is always an edge that is going down. I.e, the start point is
     // always above the end point. (in the y axis)
-    //
-    // The coordinates are expected to be in clipping coodinates, so that we can remove triangles outside
-    // of the clip space. Perspective divison (division by w) is done inside this function.
 
-    // We sort the points making v0 always be the smaller point on the x coordinate, and v1 the largest.
     Point3* v0 = &unsorted_v0;
     Point3* v1 = &unsorted_v1;
     Point3* v2 = &unsorted_v2;
 
+    // We sort the points making v0 always be the smaller point on the x coordinate, and v1 the largest.
     // If the triangle is on clockwise order, swap first 2 vertices.
     if (orient2d(v0, v1, v2) < 0)
     {
