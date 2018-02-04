@@ -1,5 +1,5 @@
 # The project
-This is a "fork" of the same project written in C (https://github.com/leohahn/voxl). It was rewritten in C++ because I was annoyed by the lack of things like function overloading, operator overloading, etc.
+This is a "fork" of the same project written in C (https://github.com/leohahn/voxl). It was rewritten in C++ because I was annoyed by the lack of things like function overloading, operator overloading, etc. This is therefore a 1-to-1 translation.
 
 # What was implemented
 - Rendering block into chunks (group of blocks) to reduce the number of draw calls.
